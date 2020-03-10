@@ -172,6 +172,7 @@ class Decoder(nn.Module):
             tensorFeat = self.moduleUpfeat(objectPrevious['tensorFeat'])
             tensorVolume = self.moduleCorreleaky(self.moduleCorrelation(tensorFirst, self.moduleBackward(tensorSecond, tensorFlow*self.dblBackward)))
             tensorFeat = torch.cat([tensorVolume, tensorFirst, tensorFlow, tensorFeat], 1)
+            # First tensor, Flow map and the new
         # DenseNet process the tensorFeat and the `moduleSix` conv that to be a 2 chan tensorFlow
         tensorFeat = torch.cat([self.moduleOne(tensorFeat), tensorFeat], 1)
         tensorFeat = torch.cat([self.moduleTwo(tensorFeat), tensorFeat], 1)

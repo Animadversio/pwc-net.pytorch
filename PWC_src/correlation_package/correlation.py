@@ -45,6 +45,7 @@ class CorrelationFunction(Function):
 
 class Correlation(Module):
     def __init__(self, pad_size=4, kernel_size=1, max_displacement=4, stride1=1, stride2=1, corr_multiply=1):
+        # seems to be doing correlation within a 9 by 9 patch, thus the max-displacement is 4 in each direction.
         super(Correlation, self).__init__()
         self.pad_size = pad_size
         self.kernel_size = kernel_size
