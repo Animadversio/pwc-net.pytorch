@@ -4,7 +4,7 @@ from torch.autograd import Function
 import correlation_cuda
 
 class CorrelationFunction(Function):
-
+    # Python interface for the real CUDA function. 
     def __init__(self, pad_size=4, kernel_size=1, max_displacement=4, stride1=1, stride2=1, corr_multiply=1):
         super(CorrelationFunction, self).__init__()
         self.pad_size = pad_size
