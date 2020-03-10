@@ -79,11 +79,14 @@ class Extractor(nn.Module):
         tensorFou = self.moduleFou(tensorThr)
         tensorFiv = self.moduleFiv(tensorFou)
         tensorSix = self.moduleSix(tensorFiv)
-
+        # Passing the image through a series of conv layer modules
+        # Use the feature tensors to fed the correlation and processing layers.
         return [ tensorOne, tensorTwo, tensorThr, tensorFou, tensorFiv, tensorSix ]
 
 
 class Backward(nn.Module):
+    # The so-called Sptial Transformming Flow part. 
+    # Use the tensorFlow to warp the tensorInput tensor. 
     def __init__(self):
         super(Backward, self).__init__()
 
@@ -111,16 +114,19 @@ class Decoder(nn.Module):
 
         intPrevious = [None, None, 81+32+2+2, 81+64+2+2, 81+96+2+2, 81+128+2+2, 81, None][intLevel+1]
         intCurrent = [None, None, 81+32+2+2, 81+64+2+2, 81+96+2+2, 81+128+2+2, 81, None][intLevel+0]
-
+        # Use deconvolution to do up-sampling 
         if intLevel < 6: self.moduleUpflow = nn.ConvTranspose2d(in_channels=2, out_channels=2, kernel_size=4, stride=2, padding=1)
-        if intLevel < 6: self.moduleUpfeat = nn.ConvTranspose2d(in_channels=intPrevious + 128 + 128 + 96 + 64 + 32, out_channels=2, kernel_size=4, stride=2, padding=1)
-
+        if intLevel < 6: self.moduleUpfeat = nn.ConvTranspose2d(in_channels=intPrevious + 128 + 128 + 96 + 64 + 32, out_channels=2, kernel_size=4, stride=2, padding=1) 
+        # upsample while compress the feature to 2d. 
+        # Backward function conduct the spatial warping using the flow 
         if intLevel < 6: self.dblBackward = [None, None, None, 5.0, 2.5, 1.25, 0.625, None ][intLevel+1]
-        if intLevel < 6: self.moduleBackward = Backward()
+        if intLevel < 6: self.moduleBackward = Backward() # Use the flow field to warp the feature tensor. 
 
         self.moduleCorrelation = correlation.Correlation()
         self.moduleCorreleaky = nn.LeakyReLU(inplace=False, negative_slope=0.1)
-
+        # Dense Net Architecture, cat the output of all previous modules as input! 
+        # Shrink the depth of output channels
+        # keep the spatial dimension the same! 
         self.moduleOne = nn.Sequential(
             nn.Conv2d(in_channels=intCurrent, out_channels=128, kernel_size=3, stride=1, padding=1),
             nn.LeakyReLU(inplace=False, negative_slope=0.1)
@@ -154,19 +160,19 @@ class Decoder(nn.Module):
         tensorFlow = None
         tensorFeat = None
 
-        if objectPrevious is None:
+        if objectPrevious is None: # Top of the pyramid! 
             tensorFlow = None
             tensorFeat = None
 
-            tensorVolume = self.moduleCorreleaky(self.moduleCorrelation(tensorFirst, tensorSecond))
-            tensorFeat = torch.cat([tensorVolume], 1)
+            tensorVolume = self.moduleCorreleaky(self.moduleCorrelation(tensorFirst, tensorSecond)) # correlation of 2 tensor as initial rough estimate
+            tensorFeat = torch.cat([tensorVolume], 1) # Leaky ReLU of the correlation between the 2 tensors
 
         elif objectPrevious is not None:
             tensorFlow = self.moduleUpflow(objectPrevious['tensorFlow'])
             tensorFeat = self.moduleUpfeat(objectPrevious['tensorFeat'])
             tensorVolume = self.moduleCorreleaky(self.moduleCorrelation(tensorFirst, self.moduleBackward(tensorSecond, tensorFlow*self.dblBackward)))
             tensorFeat = torch.cat([tensorVolume, tensorFirst, tensorFlow, tensorFeat], 1)
-
+        # DenseNet process the tensorFeat and the `moduleSix` conv that to be a 2 chan tensorFlow
         tensorFeat = torch.cat([self.moduleOne(tensorFeat), tensorFeat], 1)
         tensorFeat = torch.cat([self.moduleTwo(tensorFeat), tensorFeat], 1)
         tensorFeat = torch.cat([self.moduleThr(tensorFeat), tensorFeat], 1)
@@ -183,7 +189,7 @@ class Decoder(nn.Module):
 class Refiner(nn.Module):
     def __init__(self):
         super(Refiner, self).__init__()
-
+        # Stress the dilated convolution to increase the RF and provide context info.
         self.moduleMain = nn.Sequential(
             nn.Conv2d(in_channels=81+32+2+2+128+128+96+64+32, out_channels=128, kernel_size=3, stride=1, padding=1,  dilation=1),
             nn.LeakyReLU(inplace=False, negative_slope=0.1),
