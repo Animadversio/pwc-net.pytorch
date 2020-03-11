@@ -92,7 +92,7 @@ class Backward(nn.Module):
 
     def forward(self, tensorInput, tensorFlow):
         if hasattr(self, 'tensorPartial') == False or self.tensorPartial.size(0) != tensorFlow.size(0) or self.tensorPartial.size(2) != tensorFlow.size(2) or self.tensorPartial.size(3) != tensorFlow.size(3):
-            self.tensorPartial = tensorFlow.new_ones(tensorFlow.size(0), 1, tensorFlow.size(2), tensorFlow.size(3))
+            self.tensorPartial = tensorFlow.new_ones(tensorFlow.size(0), 1, tensorInput.size(2), tensorInput.size(3))
 
         if hasattr(self, 'tensorGrid') == False or self.tensorGrid.size(0) != tensorFlow.size(0) or self.tensorGrid.size(2) != tensorFlow.size(2) or self.tensorGrid.size(3) != tensorFlow.size(3):
             tensorHorizontal = torch.linspace(-1.0, 1.0, tensorFlow.size(3)).view(1, 1, 1, tensorFlow.size(3)).expand(tensorFlow.size(0), -1, tensorFlow.size(2), -1)
@@ -100,7 +100,8 @@ class Backward(nn.Module):
             self.tensorGrid = torch.cat([tensorHorizontal, tensorVertical], 1).cuda()
 
         tensorInput = torch.cat([tensorInput, self.tensorPartial], 1)
-        tensorFlow = torch.cat([tensorFlow[:, 0:1, :, :]/((tensorInput.size(3)-1.0)/2.0), tensorFlow[:, 1:2, :, :]/((tensorInput.size(2)-1.0)/2.0)], 1)
+        tensorFlow = torch.cat([tensorFlow[:, 0:1, :, :]/((tensorInput.size(3)-1.0)/2.0),
+                                tensorFlow[:, 1:2, :, :]/((tensorInput.size(2)-1.0)/2.0)], 1)
 
         tensorOutput = F.grid_sample(input=tensorInput, grid=(self.tensorGrid + tensorFlow).permute(0, 2, 3, 1), mode='bilinear', padding_mode='zeros')
         tensorMask = tensorOutput[:, -1:, :, :]; tensorMask[tensorMask > 0.999] = 1.0; tensorMask[tensorMask < 1.0] = 0.0
@@ -173,6 +174,7 @@ class Decoder(nn.Module):
             tensorVolume = self.moduleCorreleaky(self.moduleCorrelation(tensorFirst, self.moduleBackward(tensorSecond, tensorFlow*self.dblBackward)))
             tensorFeat = torch.cat([tensorVolume, tensorFirst, tensorFlow, tensorFeat], 1)
             # First tensor, Flow map and the new
+            # at Module Four the spatial dimension of tensorFirst and tensorFeat doesn't match
         # DenseNet process the tensorFeat and the `moduleSix` conv that to be a 2 chan tensorFlow
         tensorFeat = torch.cat([self.moduleOne(tensorFeat), tensorFeat], 1)
         tensorFeat = torch.cat([self.moduleTwo(tensorFeat), tensorFeat], 1)

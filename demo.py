@@ -11,6 +11,11 @@ FLOW_SCALE = 20.0
 
 if __name__ == '__main__':
     # Prepare img pair (size need to be a multipler of 64)
+    #%%
+    from os.path import join
+    FC_path = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\FlyingChairs\FlyingChairs_release\data"
+    im1 = cv2.imread(join(FC_path, 'example/0img0.ppm'))
+    im2 = cv2.imread('example/0img1.ppm')
     im1 = cv2.imread('example/0img0.ppm')
     im2 = cv2.imread('example/0img1.ppm')
     im1 = torch.from_numpy((im1/255.).astype(np.float32)).permute(2, 0, 1).unsqueeze(0)
@@ -20,7 +25,7 @@ if __name__ == '__main__':
 
     # Build model
     pwc = PWC_Net(model_path='models/sintel.pytorch')
-    #pwc = PWC_Net(model_path='models/chairs-things.pytorch')
+    # pwc = PWC_Net(model_path='models/chairs-things.pytorch')
     pwc = pwc.cuda()
     pwc.eval()
 
