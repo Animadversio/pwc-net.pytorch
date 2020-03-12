@@ -93,7 +93,7 @@ class Backward(nn.Module):
     def forward(self, tensorInput, tensorFlow):
         if hasattr(self, 'tensorPartial') == False or self.tensorPartial.size(0) != tensorFlow.size(0) or self.tensorPartial.size(2) != tensorFlow.size(2) or self.tensorPartial.size(3) != tensorFlow.size(3):
             self.tensorPartial = tensorFlow.new_ones(tensorFlow.size(0), 1, tensorInput.size(2), tensorInput.size(3))
-
+            # Attached to the last layer of input to be warpped as mask!
         if hasattr(self, 'tensorGrid') == False or self.tensorGrid.size(0) != tensorFlow.size(0) or self.tensorGrid.size(2) != tensorFlow.size(2) or self.tensorGrid.size(3) != tensorFlow.size(3):
             tensorHorizontal = torch.linspace(-1.0, 1.0, tensorFlow.size(3)).view(1, 1, 1, tensorFlow.size(3)).expand(tensorFlow.size(0), -1, tensorFlow.size(2), -1)
             tensorVertical = torch.linspace(-1.0, 1.0, tensorFlow.size(2)).view(1, 1, tensorFlow.size(2), 1).expand(tensorFlow.size(0), -1, -1, tensorFlow.size(3))
@@ -117,7 +117,7 @@ class Decoder(nn.Module):
         intCurrent = [None, None, 81+32+2+2, 81+64+2+2, 81+96+2+2, 81+128+2+2, 81, None][intLevel+0]
         # Use deconvolution to do up-sampling 
         if intLevel < 6: self.moduleUpflow = nn.ConvTranspose2d(in_channels=2, out_channels=2, kernel_size=4, stride=2, padding=1)
-        if intLevel < 6: self.moduleUpfeat = nn.ConvTranspose2d(in_channels=intPrevious + 128 + 128 + 96 + 64 + 32, out_channels=2, kernel_size=4, stride=2, padding=1) 
+        if intLevel < 6: self.moduleUpfeat = nn.ConvTranspose2d(in_channels=intPrevious + 128 + 128 + 96 + 64 + 32, out_channels=2, kernel_size=4, stride=2, padding=1)
         # upsample while compress the feature to 2d. 
         # Backward function conduct the spatial warping using the flow 
         if intLevel < 6: self.dblBackward = [None, None, None, 5.0, 2.5, 1.25, 0.625, None ][intLevel+1]
@@ -157,23 +157,25 @@ class Decoder(nn.Module):
             nn.Conv2d(in_channels=intCurrent + 128 + 128 + 96 + 64 + 32, out_channels=2, kernel_size=3, stride=1, padding=1)
         )
 
+
     def forward(self, tensorFirst, tensorSecond, objectPrevious):
         tensorFlow = None
         tensorFeat = None
 
-        if objectPrevious is None: # Top of the pyramid! 
+        if objectPrevious is None:  # Top of the pyramid! no need to upsample flow and feature map.
             tensorFlow = None
             tensorFeat = None
-
-            tensorVolume = self.moduleCorreleaky(self.moduleCorrelation(tensorFirst, tensorSecond)) # correlation of 2 tensor as initial rough estimate
-            tensorFeat = torch.cat([tensorVolume], 1) # Leaky ReLU of the correlation between the 2 tensors
-
+            # correlation of 2 tensor as initial rough estimate of cost volume
+            tensorVolume = self.moduleCorreleaky(self.moduleCorrelation(tensorFirst, tensorSecond))
+            tensorFeat = torch.cat([tensorVolume], 1)  # Leaky ReLU of the correlation between the 2 tensors
+            # Only the cost volume goes into DenseNet
         elif objectPrevious is not None:
-            tensorFlow = self.moduleUpflow(objectPrevious['tensorFlow'])
-            tensorFeat = self.moduleUpfeat(objectPrevious['tensorFeat'])
+            # F.pad(, [0, pW, 0, pH])
+            tensorFlow = pad_as_size(self.moduleUpflow(objectPrevious['tensorFlow']), output_size=tensorFirst.shape[-2:])
+            tensorFeat = pad_as_size(self.moduleUpfeat(objectPrevious['tensorFeat']), output_size=tensorFirst.shape[-2:])
             tensorVolume = self.moduleCorreleaky(self.moduleCorrelation(tensorFirst, self.moduleBackward(tensorSecond, tensorFlow*self.dblBackward)))
             tensorFeat = torch.cat([tensorVolume, tensorFirst, tensorFlow, tensorFeat], 1)
-            # First tensor, Flow map and the new
+            # Cost Volume, First tensor, Flow map and the compressed Feature tensor from last pyramid level.
             # at Module Four the spatial dimension of tensorFirst and tensorFeat doesn't match
         # DenseNet process the tensorFeat and the `moduleSix` conv that to be a 2 chan tensorFlow
         tensorFeat = torch.cat([self.moduleOne(tensorFeat), tensorFeat], 1)
@@ -188,6 +190,10 @@ class Decoder(nn.Module):
             'tensorFeat': tensorFeat
         }
 
+def pad_as_size(input, output_size):
+    pH = output_size[-2] - input.shape[-2]
+    pW = output_size[-1] - input.shape[-1]
+    return F.pad(input, [0, pW, 0, pH])
 
 class Refiner(nn.Module):
     def __init__(self):
