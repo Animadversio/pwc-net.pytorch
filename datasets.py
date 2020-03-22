@@ -20,15 +20,16 @@ toTsr = transforms.ToTensor()
 # * Data feeding
 # *
 #%%
+dataset_home = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets"
 class SintelDataset(Dataset):
     def __init__(self, render="clean", preload=False, torchify=True, cropsize=None):
         if render == "clean":
-            self.frame_dir = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\training\clean"
+            self.frame_dir = join(dataset_home, r"Sintel\training\clean")
         elif render == "final":
-            self.frame_dir = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\training\final"
+            self.frame_dir = join(dataset_home, r"Sintel\training\final")
         elif render == "albedo":
-            self.frame_dir = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\training\albedo"
-        self.flow_dir = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\training\flow"
+            self.frame_dir = join(dataset_home, r"Sintel\training\albedo")
+        self.flow_dir = join(dataset_home, r"Sintel\training\flow")
         self.render = render
         self.torchify = torchify
         self.preloaded = False
@@ -88,8 +89,8 @@ class SintelDataset(Dataset):
 
 class FlyingChairDataset(Dataset):
     def __init__(self, preload=False, torchify=True, cropsize=None):
-        self.frame_dir = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\FlyingChairs\FlyingChairs_release\data"
-        self.flow_dir = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\FlyingChairs\FlyingChairs_release\data"
+        self.frame_dir = join(dataset_home, r"FlyingChairs\FlyingChairs_release\data")
+        self.flow_dir = join(dataset_home, r"FlyingChairs\FlyingChairs_release\data")
         self.torchify = torchify
         self.preloaded = False
         self.build_idx(preload)
