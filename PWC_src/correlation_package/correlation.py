@@ -15,6 +15,7 @@ class CorrelationFunction(Function):
         self.corr_multiply = corr_multiply
         # self.out_channel = ((max_displacement/stride2)*2 + 1) * ((max_displacement/stride2)*2 + 1)
 
+
     def forward(self, input1, input2):
         self.save_for_backward(input1, input2)
         with torch.cuda.device_of(input1):
@@ -26,6 +27,7 @@ class CorrelationFunction(Function):
                 self.pad_size, self.kernel_size, self.max_displacement,self.stride1, self.stride2, self.corr_multiply)
 
         return output
+
 
     def backward(self, grad_output):
         input1, input2 = self.saved_tensors
@@ -56,7 +58,7 @@ class Correlation(Module):
 
     def forward(self, input1, input2):
 
-        result = CorrelationFunction(self.pad_size, self.kernel_size, self.max_displacement,self.stride1, self.stride2, self.corr_multiply)(input1, input2)
+        result = CorrelationFunction(self.pad_size, self.kernel_size, self.max_displacement,self.stride1, self.stride2, self.corr_multiply).forward(input1, input2)
 
         return result
 

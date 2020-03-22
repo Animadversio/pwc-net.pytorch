@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .correlation_package import correlation
-
+# from .correlation import correlation
 
 class Extractor(nn.Module):
     def __init__(self):
@@ -103,7 +103,7 @@ class Backward(nn.Module):
         tensorFlow = torch.cat([tensorFlow[:, 0:1, :, :]/((tensorInput.size(3)-1.0)/2.0),
                                 tensorFlow[:, 1:2, :, :]/((tensorInput.size(2)-1.0)/2.0)], 1)
 
-        tensorOutput = F.grid_sample(input=tensorInput, grid=(self.tensorGrid + tensorFlow).permute(0, 2, 3, 1), mode='bilinear', padding_mode='zeros')
+        tensorOutput = F.grid_sample(input=tensorInput, grid=(self.tensorGrid + tensorFlow).permute(0, 2, 3, 1), mode='bilinear', padding_mode='zeros', align_corners=True)
         tensorMask = tensorOutput[:, -1:, :, :]; tensorMask[tensorMask > 0.999] = 1.0; tensorMask[tensorMask < 1.0] = 0.0
 
         return tensorOutput[:, :-1, :, :] * tensorMask
@@ -123,7 +123,7 @@ class Decoder(nn.Module):
         if intLevel < 6: self.dblBackward = [None, None, None, 5.0, 2.5, 1.25, 0.625, None ][intLevel+1]
         if intLevel < 6: self.moduleBackward = Backward() # Use the flow field to warp the feature tensor. 
 
-        self.moduleCorrelation = correlation.Correlation()
+        self.moduleCorrelation = correlation.Correlation() # correlation.FunctionCorrelation
         self.moduleCorreleaky = nn.LeakyReLU(inplace=False, negative_slope=0.1)
         # Dense Net Architecture, cat the output of all previous modules as input! 
         # Shrink the depth of output channels
@@ -173,7 +173,7 @@ class Decoder(nn.Module):
             # F.pad(, [0, pW, 0, pH])
             tensorFlow = pad_as_size(self.moduleUpflow(objectPrevious['tensorFlow']), output_size=tensorFirst.shape[-2:])
             tensorFeat = pad_as_size(self.moduleUpfeat(objectPrevious['tensorFeat']), output_size=tensorFirst.shape[-2:])
-            tensorVolume = self.moduleCorreleaky(self.moduleCorrelation(tensorFirst, self.moduleBackward(tensorSecond, tensorFlow*self.dblBackward)))
+            tensorVolume = self.moduleCorreleaky(self.moduleCorrelation(tensorFirst, self.moduleBackward(tensorSecond, tensorFlow*self.dblBackward).contiguous() ))
             tensorFeat = torch.cat([tensorVolume, tensorFirst, tensorFlow, tensorFeat], 1)
             # Cost Volume, First tensor, Flow map and the compressed Feature tensor from last pyramid level.
             # at Module Four the spatial dimension of tensorFirst and tensorFeat doesn't match
