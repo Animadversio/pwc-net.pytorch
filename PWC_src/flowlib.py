@@ -239,8 +239,8 @@ def flow_error(tu, tv, u, v):
     mepe = np.mean(epe)
     return mepe
 
-
-def flow_to_image(flow, display=False):
+#%%
+def flow_to_image(flow, display=False, get_lim=False, radlim=None):
     """
     Convert flow into middlebury color code image
     :param flow: optical flow map
@@ -249,23 +249,25 @@ def flow_to_image(flow, display=False):
     u = flow[:, :, 0]
     v = flow[:, :, 1]
 
+    idxUnknow = (abs(u) > UNKNOWN_FLOW_THRESH) | (abs(v) > UNKNOWN_FLOW_THRESH)
+    u[idxUnknow] = 0
+    v[idxUnknow] = 0
+
     maxu = -999.
     maxv = -999.
     minu = 999.
     minv = 999.
-
-    idxUnknow = (abs(u) > UNKNOWN_FLOW_THRESH) | (abs(v) > UNKNOWN_FLOW_THRESH)
-    u[idxUnknow] = 0
-    v[idxUnknow] = 0
 
     maxu = max(maxu, np.max(u))
     minu = min(minu, np.min(u))
 
     maxv = max(maxv, np.max(v))
     minv = min(minv, np.min(v))
-
-    rad = np.sqrt(u ** 2 + v ** 2)
-    maxrad = max(-1, np.max(rad))
+    if radlim is None:
+        rad = np.sqrt(u ** 2 + v ** 2)
+        maxrad = max(-1, np.max(rad))
+    else:
+        maxrad = radlim
 
     if display:
         print("max flow: %.4f\nflow range:\nu = %.3f .. %.3f\nv = %.3f .. %.3f" % (maxrad, minu,maxu, minv, maxv))
@@ -277,9 +279,11 @@ def flow_to_image(flow, display=False):
 
     idx = np.repeat(idxUnknow[:, :, np.newaxis], 3, axis=2)
     img[idx] = 0
-
-    return np.uint8(img)
-
+    if get_lim:
+        return np.uint8(img), maxrad
+    else:
+        return np.uint8(img)
+#%%
 
 def evaluate_flow_file(gt, pred):
     """

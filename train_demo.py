@@ -10,11 +10,12 @@ from PWC_src import flow_to_image, read_flow, write_flow, flow_error, segment_fl
 FLOW_SCALE = 20.0
 # Build model
 # pwc = PWC_Net(model_path='models/sintel.pytorch')
-pwc = PWC_Net(model_path='models/chairs-things.pytorch')
-pwc = pwc.cuda()
+# pwc = PWC_Net(model_path='models/chairs-things.pytorch')
+# pwc = pwc.cuda()
 # pwc.eval()
-pwc.train()
+# pwc.train()
 #%%
+import time
 from os import listdir, makedirs
 from os.path import join
 from imageio import imwrite
@@ -23,11 +24,11 @@ from scipy.ndimage import zoom
 from datasets import SintelDataset, FlyingChairDataset, resize_pyramid, DataLoader
 # SintelClean = SintelDataset(render="clean", torchify=True, cropsize=None)
 SintelClean_crop = SintelDataset(render="clean", torchify=True, cropsize=(384, 768))
-FCData = FlyingChairDataset(torchify=False)  # , cropsize=(384, 768)
+# FCData = FlyingChairDataset(torchify=False)  # , cropsize=(384, 768)
 # DataLoader
 #%%
-pyr = resize_pyramid(flow)
-pyr = resize_pyramid(tsrim1)
+# pyr = resize_pyramid(flow)
+# pyr = resize_pyramid(tsrim1)
 #%%
 train_n = 800
 val_n = 241
@@ -39,30 +40,32 @@ val_loader = DataLoader(dataset=Stl_val_set, batch_size=Bsize,
                     shuffle=False, drop_last=False,) # maybe validation doesn't require cropping?
                     #sampler=torch.utils.data.RandomSampler(SintelClean))
 #%%
-pwc = PWC_Net(model_path='models/chairs-things.pytorch')
+# pwc = PWC_Net(model_path='models/chairs-things.pytorch')
 # pwc = PWC_Net(model_path='models/sintel.pytorch')
-pwc.train()
+pwc = PWC_Net(model_path='../train_log/train_demo_ep002_val2.144.pytorch')
 pwc.cuda()
+pwc.train()
 #%%
 def loss_fun(diff, eps=0.01, q=0.4):
     return torch.mean(torch.pow(torch.sum(torch.abs(diff), dim=1) + eps, q)).squeeze()
+
 from torch import optim
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter(log_dir="..\\train_log", flush_secs=180)
-
 # pwc = PWC_Net(model_path='models/sintel.pytorch')
-optimizer = optim.Adam(pwc.parameters(), lr=0.00001, weight_decay=0.0004)
+optimizer = optim.Adam(pwc.parameters(), lr=0.000005, weight_decay=0.0004)
 # loader = DataLoader(dataset=SintelClean, batch_size=1,
 #                     shuffle=True, drop_last=True,)
-                    #sampler=torch.utils.data.RandomSampler(SintelClean))
+#                     sampler=torch.utils.data.RandomSampler(SintelClean))
 alpha_w = [None, 0.005, 0.01, 0.02, 0.08, 0.32]
+globstep = 2400
 #%%
 import matplotlib
 matplotlib.use("Agg") # prevent image output
 #%%
-epocs = 20
+epocs = 50
 #globstep = 0
-for ep_i in range(100, 100+epocs):
+for ep_i in range(0, epocs):
     t0 = time.time()
     running_loss = 0
     running_mepe = 0
@@ -125,14 +128,13 @@ for ep_i in range(100, 100+epocs):
     writer.add_scalar('Eval/full_mepe', (running_mepe + val_mepe) / (val_n + train_n), global_step=globstep)
     torch.save(pwc.state_dict(), r"../train_log/train_demo_ep%03d_val%.3f.pytorch" % (ep_i, val_mepe / val_n))
 #%%
-
 # Using batch size of one to pass, it's fine, nothing wrong.
 # But Batch size of 2 will cause distortion in the output! (Batch norm not working?)
 #%%
 import matplotlib.pylab as plt
 l = 5
-flowimg1 = flow_to_image(predflow_pyr[l].detach().cpu().permute([0,2,3,1]).numpy()[1, :]*20)
-flowtr1 = flow_to_image(trflow_pyr[max(l-1, 0)].detach().cpu().permute([0,2,3,1]).numpy()[1, :])
+flowimg1 = flow_to_image(predflow_pyr[l].detach().cpu().permute([0, 2, 3, 1]).numpy()[1, :]*20)
+flowtr1 = flow_to_image(trflow_pyr[max(l-1, 0)].detach().cpu().permute([0, 2, 3, 1]).numpy()[1, :])
 #flowimg2 = flow_to_image(predflow_pyr[l].detach().cpu().permute([0,2,3,1]).numpy()[1, :])
 plt.figure(figsize=[8, 12])
 for l in range(0, 6):
@@ -143,6 +145,7 @@ for l in range(0, 6):
     plt.subplot(6, 2, 2 * l + 2)
     plt.imshow(flowtr1)
 plt.show()
+
 #%%
 plt.figure(figsize=[10,5])
 plt.imshow(trflow_pyr[max(l, 0)].detach().cpu().permute([0, 2, 3, 1]).numpy()[0, :,:,1]/20)

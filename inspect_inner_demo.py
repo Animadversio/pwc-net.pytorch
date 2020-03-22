@@ -122,6 +122,8 @@ trflow_pyr = resize_pyramid(trflow.unsqueeze(0).cuda())
 predflow_pyr = pwc(im1.unsqueeze(0).cuda(), im2.unsqueeze(0).cuda())
 visualize_pyr(predflow_pyr, trflow_pyr, im1=im1, im2=im2,level=None)
 #%%
+FLOW_SCALE = 20.0
+import matplotlib.pylab as plt
 plt.tick_params(top='off', bottom='off', left='off', right='off', labelleft='off', labelbottom='on')
 def visualize_pyr(predflow_pyr, trflow_pyr, im1=None, im2=None, level=None):
     sample_n = trflow_pyr[0].shape[0]
@@ -133,15 +135,6 @@ def visualize_pyr(predflow_pyr, trflow_pyr, im1=None, im2=None, level=None):
             if im1 is not None:
                 coln = 7
                 padn = 2
-            for l in range(0, 6):
-                flowimg = flow_to_image(20*predflow_pyr[l].detach().cpu().permute([0, 2, 3, 1]).numpy()[s, :])
-                flowtr = flow_to_image(trflow_pyr[max(l - 1, 0)].detach().cpu().permute([0, 2, 3, 1]).numpy()[s, :])
-                plt.subplot(coln, 2, 2 * l + 1 + padn)
-                plt.imshow(flowimg)
-                plt.axis("off")  # plt.xticks([])
-                plt.subplot(coln, 2, 2 * l + 2 + padn)
-                plt.imshow(flowtr)
-                plt.axis("off")  # plt.xticks([])
             if im1 is not None:
                 if len(im1.shape) == 4:
                     plt.subplot(coln, 2, 1)
@@ -157,7 +150,16 @@ def visualize_pyr(predflow_pyr, trflow_pyr, im1=None, im2=None, level=None):
                     plt.subplot(coln, 2, 2)
                     plt.imshow(im2.permute([1,2,0]).numpy())
                     plt.axis("off")  #plt.xticks([])
-            #figh.show()
+            for l in range(0, 6):
+                flowtr, maxrad = flow_to_image(trflow_pyr[max(l - 1, 0)].detach().cpu().permute([0, 2, 3, 1]).numpy()[s, :], get_lim=True)
+                flowimg = flow_to_image(FLOW_SCALE * predflow_pyr[l].detach().cpu().permute([0, 2, 3, 1]).numpy()[s, :], radlim=maxrad)
+                plt.subplot(coln, 2, 2 * l + 1 + padn)
+                plt.imshow(flowimg)
+                plt.axis("off")  # plt.xticks([])
+                plt.subplot(coln, 2, 2 * l + 2 + padn)
+                plt.imshow(flowtr)
+                plt.axis("off")  # plt.xticks([])
+            # figh.show()
             figh_list.append(figh)
         return figh_list
     else:
@@ -165,8 +167,10 @@ def visualize_pyr(predflow_pyr, trflow_pyr, im1=None, im2=None, level=None):
         coln = 1
         padn = 0
         for s in range(sample_n):
-            flowimg = flow_to_image(predflow_pyr[l].detach().cpu().permute([0, 2, 3, 1]).numpy()[s, :])
-            flowtr = flow_to_image(trflow_pyr[max(l - 1, 0)].detach().cpu().permute([0, 2, 3, 1]).numpy()[s, :])
+            flowtr, maxrad = flow_to_image(trflow_pyr[max(l - 1, 0)].detach().cpu().permute([0, 2, 3, 1]).numpy()[s, :],
+                                           get_lim=True)
+            flowimg = flow_to_image(20 * predflow_pyr[l].detach().cpu().permute([0, 2, 3, 1]).numpy()[s, :],
+                                    radlim=maxrad)
             figh = plt.figure(figsize=[8, 4])
             plt.subplot(2, 2, 1)
             plt.imshow(flowimg)
