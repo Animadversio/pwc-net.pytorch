@@ -18,6 +18,7 @@ from os.path import join
 from imageio import imwrite
 from scipy.ndimage import zoom
 import time
+#%%
 # S_clean_path = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\training\clean"
 # S_clean_output = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\training_output"
 S_clean_path = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\test\clean"
@@ -45,16 +46,14 @@ for scene in scenes:
         write_flow(flow_up, join(S_clean_output, scene, imgseq[imgi].split(".")[0] + ".flo"))
         imwrite(join(S_clean_output, scene, imgseq[imgi].split(".")[0] + "_flow.png"), flow_im)
         imwrite(join(S_clean_output, scene, imgseq[imgi].split(".")[0] + "_flow_up.png"), flow_up_im)
-#%%
-sintel_flow_gt = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\training\flow"
-for scene in scenes[0:1]:
-    flowseq = sorted(listdir(join(sintel_flow_gt, scene)))
-    for imgi in range(len(flowseq)):
-        flow_arr = read_flow(join(sintel_flow_gt, scene, flowseq[imgi]))
-#%%
+#%% Evaluate result on training set
 from scipy.ndimage import zoom
 err_col = {}
 err_all = []
+S_clean_path = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\training\clean"
+S_clean_output = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\training_output"
+sintel_flow_gt = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\training\flow"
+scenes = listdir(S_clean_path)
 for scene in scenes:
     print("Scene %s" % scene)
     flowseq = sorted([fn for fn in listdir(join(S_clean_output, scene)) if ".flo" in fn])
@@ -69,7 +68,10 @@ for scene in scenes:
         err_col[scene].append(mepe)
 import pickle
 pickle.dump({"err_all":err_all, "err_dict":err_col}, open("..\\Sintel_clean_EPE.pk", "wb"))
-#%%
+
+
+#%% Evaluate result on test set
+S_clean_path = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\test\clean"
 S_clean_output = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\test_output"
 sintel_flow_gt_test = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\test\clean"
 test_err_col = {}
@@ -89,10 +91,10 @@ for scene in scenes:
 import pickle
 pickle.dump({"err_all":test_err_all, "err_dict":test_err_col}, open("..\\Sintel_clean_test_EPE.pk", "wb"))
 #%%
+import pickle
 D = pickle.load(open("..\\Sintel_clean_EPE.pk", "rb"))
 #%%
 from scipy.ndimage import zoom
-flow_upsamp = zoom(flow_arr, [4, 4, 1], order=1)
 #%% Visualization
 import matplotlib.pyplot as plt
 plt.imshow(flow_to_image(flow_upsamp))
@@ -109,3 +111,32 @@ plt.xlabel("MEPE")
 plt.ylabel("frame pairs")
 plt.savefig("..\\Results\\sintel_clean_train_epe.png")
 plt.show()
+#%%
+import sys
+sys.path.append("misc")
+from montage import build_montages
+# %%
+import pickle
+D = pickle.load(open("..\\Sintel_clean_EPE.pk", "rb"))
+err_col = D["err_dict"]
+#%% Montage the original images and the ground truth and the error output together!
+S_clean_path = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\training\clean"
+S_clean_output = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\training_output"
+flow_viz_path = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\training\flow_viz"
+S_clean_err = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\err_examine"
+scenes = listdir(S_clean_path)
+for scene in scenes:
+    err_score = np.array(err_col[scene])
+    idx = np.argsort(err_score)
+    err_frames = idx[-10:]
+    imgseq = sorted(listdir(join(S_clean_path, scene)))
+    makedirs(join(S_clean_err, scene), exist_ok=True)
+    for imgi in err_frames:
+        im1 = cv2.imread(join(S_clean_path, scene, imgseq[imgi]))
+        im2 = cv2.imread(join(S_clean_path, scene, imgseq[imgi + 1]))
+        flow_infer_im = cv2.imread(join(S_clean_output, scene, "frame_%04d_flow.png" % (imgi + 1)))
+        flow_truth_im = cv2.imread(join(flow_viz_path, scene, "frame_%04d.png" % (imgi + 1)))
+        flow_montage = build_montages([im1, im2, flow_infer_im, flow_truth_im], (436, 1024, ), (2, 2))
+        imwrite(join(S_clean_err, scene, "frame_%04d_err%.2f.jpg"%(imgi + 1, err_score[imgi])), flow_montage[0])
+        # read_flow(join(sintel_flow_gt_test, scene, flowseq[imgi]))
+        # flow_infer = read_flow(join(S_clean_output, scene, flowseq[imgi]))

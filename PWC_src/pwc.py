@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+#%%
 import getopt
 import math
 import numpy
@@ -220,7 +220,7 @@ class Refiner(nn.Module):
 
 
 class PWC_Net(nn.Module):
-    def __init__(self, model_path=None):
+    def __init__(self, model_path=None, debug=False):
         super(PWC_Net, self).__init__()
         self.model_path = model_path
 
@@ -232,18 +232,25 @@ class PWC_Net(nn.Module):
         self.moduleSix = Decoder(6)
         self.moduleRefiner = Refiner()
         self.load_state_dict(torch.load(self.model_path))
+        self.debug = debug
+
 
     def forward(self, tensorFirst, tensorSecond):
         tensorFirst = self.moduleExtractor(tensorFirst)
         tensorSecond = self.moduleExtractor(tensorSecond)
 
-        objectEstimate = self.moduleSix(tensorFirst[-1], tensorSecond[-1], None)
-        objectEstimate = self.moduleFiv(tensorFirst[-2], tensorSecond[-2], objectEstimate)
-        objectEstimate = self.moduleFou(tensorFirst[-3], tensorSecond[-3], objectEstimate)
-        objectEstimate = self.moduleThr(tensorFirst[-4], tensorSecond[-4], objectEstimate)
-        objectEstimate = self.moduleTwo(tensorFirst[-5], tensorSecond[-5], objectEstimate)
-
-        return objectEstimate['tensorFlow'] + self.moduleRefiner(objectEstimate['tensorFeat'])
+        objectEstimate = self.moduleSix(tensorFirst[-1], tensorSecond[-1], None); flow6 = objectEstimate['tensorFlow']
+        objectEstimate = self.moduleFiv(tensorFirst[-2], tensorSecond[-2], objectEstimate); flow5 = objectEstimate['tensorFlow']
+        objectEstimate = self.moduleFou(tensorFirst[-3], tensorSecond[-3], objectEstimate); flow4 = objectEstimate['tensorFlow']
+        objectEstimate = self.moduleThr(tensorFirst[-4], tensorSecond[-4], objectEstimate); flow3 = objectEstimate['tensorFlow']
+        objectEstimate = self.moduleTwo(tensorFirst[-5], tensorSecond[-5], objectEstimate); flow2 = objectEstimate['tensorFlow']
+        flow_refined = flow2 + self.moduleRefiner(objectEstimate['tensorFeat'])
+        if self.training:
+            return [flow_refined, flow2, flow3, flow4, flow5, flow6]
+        elif self.debug:
+            return [flow_refined, flow2, flow3, flow4, flow5, flow6], tensorFirst, tensorSecond
+        else:
+            return flow_refined  # objectEstimate['tensorFlow'] + self.moduleRefiner(objectEstimate['tensorFeat'])
 
 
 if __name__ == '__main__':

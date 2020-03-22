@@ -435,7 +435,7 @@ def compute_color(u, v):
     :return: optical flow in color code
     """
     [h, w] = u.shape
-    img = np.zeros([h, w, 3])
+    img = np.zeros([h, w, 3]).astype(np.uint8)
     nanIdx = np.isnan(u) | np.isnan(v)
     u[nanIdx] = 0
     v[nanIdx] = 0
