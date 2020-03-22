@@ -11,8 +11,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .correlation_package import correlation
-# from .correlation import correlation
+# from .correlation_package import correlation
+from .correlation import correlation
 
 class Extractor(nn.Module):
     def __init__(self):
@@ -123,7 +123,7 @@ class Decoder(nn.Module):
         if intLevel < 6: self.dblBackward = [None, None, None, 5.0, 2.5, 1.25, 0.625, None ][intLevel+1]
         if intLevel < 6: self.moduleBackward = Backward() # Use the flow field to warp the feature tensor. 
 
-        self.moduleCorrelation = correlation.Correlation() # correlation.FunctionCorrelation
+        self.moduleCorrelation = correlation.FunctionCorrelation  # correlation.Correlation() #
         self.moduleCorreleaky = nn.LeakyReLU(inplace=False, negative_slope=0.1)
         # Dense Net Architecture, cat the output of all previous modules as input! 
         # Shrink the depth of output channels

@@ -5,16 +5,9 @@ import torch
 import torch.nn.functional as F
 from torchvision import transforms
 from PWC_src import PWC_Net
-from PWC_src import flow_to_image, read_flow, write_flow, flow_error, segment_flow
-#%%
+from PWC_src import flow_to_image, read_flow, write_flow, flow_error, segment_flow, evaluate_flow
+from visualization import visualize_pyr, visualize_samples, visualize_batch_samples
 FLOW_SCALE = 20.0
-# Build model
-# pwc = PWC_Net(model_path='models/sintel.pytorch')
-# pwc = PWC_Net(model_path='models/chairs-things.pytorch')
-# pwc = pwc.cuda()
-# pwc.eval()
-# pwc.train()
-#%%
 import time
 from os import listdir, makedirs
 from os.path import join
@@ -25,11 +18,7 @@ from datasets import SintelDataset, FlyingChairDataset, resize_pyramid, DataLoad
 # SintelClean = SintelDataset(render="clean", torchify=True, cropsize=None)
 SintelClean_crop = SintelDataset(render="clean", torchify=True, cropsize=(384, 768))
 # FCData = FlyingChairDataset(torchify=False)  # , cropsize=(384, 768)
-# DataLoader
-#%%
-# pyr = resize_pyramid(flow)
-# pyr = resize_pyramid(tsrim1)
-#%%
+#%%# DataLoader
 train_n = 800
 val_n = 241
 Bsize = 4
@@ -37,28 +26,28 @@ Stl_train_set, Stl_val_set = torch.utils.data.random_split(SintelClean_crop, [80
 train_loader = DataLoader(dataset=Stl_train_set, batch_size=Bsize,
                     shuffle=True, drop_last=True,)
 val_loader = DataLoader(dataset=Stl_val_set, batch_size=Bsize,
-                    shuffle=False, drop_last=False,) # maybe validation doesn't require cropping?
-                    #sampler=torch.utils.data.RandomSampler(SintelClean))
+                    shuffle=False, drop_last=False,)  # maybe validation doesn't require cropping?
 #%%
-# pwc = PWC_Net(model_path='models/chairs-things.pytorch')
+pwc = PWC_Net(model_path='models/chairs-things.pytorch')
 # pwc = PWC_Net(model_path='models/sintel.pytorch')
-pwc = PWC_Net(model_path='../train_log/train_demo_ep002_val2.144.pytorch')
+# pwc = PWC_Net(model_path='../train_log/train_demo_ep002_val2.144.pytorch')
 pwc.cuda()
 pwc.train()
 #%%
-def loss_fun(diff, eps=0.01, q=0.4):
-    return torch.mean(torch.pow(torch.sum(torch.abs(diff), dim=1) + eps, q)).squeeze()
-
+# def loss_fun(diff, eps=0.01, q=0.4):
+#     return torch.mean(torch.pow(torch.sum(torch.abs(diff), dim=1) + eps, q)).squeeze()
+def loss_fun(diff):
+    return torch.mean(torch.sqrt(torch.sum(torch.pow(diff, 2), dim=1))).squeeze()
 from torch import optim
 from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter(log_dir="..\\train_log", flush_secs=180)
+writer = SummaryWriter(log_dir="..\\train_log_L2", flush_secs=180)
 # pwc = PWC_Net(model_path='models/sintel.pytorch')
-optimizer = optim.Adam(pwc.parameters(), lr=0.000005, weight_decay=0.0004)
+optimizer = optim.Adam(pwc.parameters(), lr=0.0001, weight_decay=0.0004)
 # loader = DataLoader(dataset=SintelClean, batch_size=1,
 #                     shuffle=True, drop_last=True,)
 #                     sampler=torch.utils.data.RandomSampler(SintelClean))
 alpha_w = [None, 0.005, 0.01, 0.02, 0.08, 0.32]
-globstep = 2400
+globstep = 0
 #%%
 import matplotlib
 matplotlib.use("Agg") # prevent image output
@@ -84,24 +73,17 @@ for ep_i in range(0, epocs):
         running_loss += loss.detach().cpu().numpy()
         mepes = []
         for si in range(im1.shape[0]):
-            mepe = flow_error(trflow_pyr[0][si, 0, :, :].detach().cpu().numpy(),
-                              trflow_pyr[0][si, 1, :, :].detach().cpu().numpy(),
-                              FLOW_SCALE * predflow_pyr[0][si, 0, :, :].detach().cpu().numpy(),
-                              FLOW_SCALE * predflow_pyr[0][si, 1, :, :].detach().cpu().numpy())
+            mepe = evaluate_flow(trflow_pyr[0][si, :].detach().cpu().permute(1, 2, 0).numpy(),
+                          FLOW_SCALE * predflow_pyr[0][si, :].detach().cpu().permute(1, 2, 0).numpy())
             running_mepe += mepe
             mepes.append(mepe)
-        print(time.time() - t0, " sec, %d batch, B mepe %.3f, running loss %.2f, running mepe %.2f" % (Bi + 1,
-                            np.mean(mepes), running_loss / (Bi + 1) / Bsize, running_mepe / (Bi + 1) / Bsize, ))
-        if (Bi) % 25 == 0:
+        print("%.3f sec, %d batch, B mepe %.3f, running loss %.2f, running mepe %.2f" % (time.time() - t0,
+            Bi + 1, np.mean(mepes), running_loss / (Bi + 1) / Bsize, running_mepe / (Bi + 1) / Bsize, ))
+        if (Bi) % 50 == 0:
             writer.add_scalar('Loss/loss', loss, global_step=globstep)
             writer.add_scalar('Loss/running_loss', running_loss / Bsize/ (Bi+1), global_step=globstep)
             writer.add_scalar('Eval/mepe', mepe, global_step=globstep)
             writer.add_scalar('Eval/running_mepe', running_mepe / Bsize/ (Bi + 1), global_step=globstep)
-            # writer.add_images('Flow/Refined', predflow_pyr[0], global_step=Bi)
-            # writer.add_images('Flow/Level2', predflow_pyr[1], global_step=Bi)
-            # writer.add_images('Flow/Level3', predflow_pyr[2], global_step=Bi)
-            # writer.add_images('Flow/Level4', predflow_pyr[3], global_step=Bi)
-            # writer.add_images('Flow/Level5', predflow_pyr[4], global_step=Bi)
             figh_list = visualize_pyr(predflow_pyr, trflow_pyr, im1=im1, im2=im2, level=None)
             for si in range(len(figh_list)):
                 writer.add_figure('Figure/flow_cmp%d'%si, figh_list[si], global_step=globstep)
@@ -117,16 +99,15 @@ for ep_i in range(0, epocs):
                 loss = loss + alpha_w[level] * loss_fun(FLOW_SCALE * predflow_pyr[level] - trflow_pyr[level - 1])
             val_loss += loss.detach().cpu().numpy()
             for si in range(im1.shape[0]):
-                mepe = flow_error(trflow_pyr[0][si, 0, :, :].detach().cpu().numpy(),
-                                  trflow_pyr[0][si, 1, :, :].detach().cpu().numpy(),
-                                  FLOW_SCALE * predflow_pyr[0][si, 0, :, :].detach().cpu().numpy(),
-                                  FLOW_SCALE * predflow_pyr[0][si, 1, :, :].detach().cpu().numpy())
+                mepe = evaluate_flow(trflow_pyr[0][si, :].detach().cpu().permute(1, 2, 0).numpy(),
+                                     FLOW_SCALE * predflow_pyr[0][si, :].detach().cpu().permute(1, 2, 0).numpy())
                 val_mepe += mepe
     writer.add_scalar('Loss/val_loss', val_loss / val_n, global_step=globstep)
     writer.add_scalar('Eval/val_mepe', val_mepe / val_n, global_step=globstep)
     writer.add_scalar('Loss/full_loss', (running_loss + val_loss) / (val_n + train_n), global_step=globstep)
     writer.add_scalar('Eval/full_mepe', (running_mepe + val_mepe) / (val_n + train_n), global_step=globstep)
-    torch.save(pwc.state_dict(), r"../train_log/train_demo_ep%03d_val%.3f.pytorch" % (ep_i, val_mepe / val_n))
+    torch.save(pwc.state_dict(), r"../train_log_L2/train_demo_ep%03d_val%.3f.pytorch" % (ep_i, val_mepe / val_n))
+
 #%%
 # Using batch size of one to pass, it's fine, nothing wrong.
 # But Batch size of 2 will cause distortion in the output! (Batch norm not working?)

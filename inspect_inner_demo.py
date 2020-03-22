@@ -159,7 +159,9 @@ warp_image
 
 #%%
 import time
-
+#%%
+# pyr = resize_pyramid(flow)
+# pyr = resize_pyramid(tsrim1)
 
 #%%
 im1 = cv2.imread(r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets\Sintel\training\final\alley_1\frame_0002.png")
