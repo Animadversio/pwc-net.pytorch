@@ -13,12 +13,12 @@ from os import listdir, makedirs
 from os.path import join
 from imageio import imwrite
 from scipy.ndimage import zoom
-#%%
+#%
 from datasets import SintelDataset, FlyingChairDataset, resize_pyramid, DataLoader
 # SintelClean = SintelDataset(render="clean", torchify=True, cropsize=None)
 SintelClean_crop = SintelDataset(render="clean", torchify=True, cropsize=(384, 768))
 # FCData = FlyingChairDataset(torchify=False)  # , cropsize=(384, 768)
-#%%# DataLoader
+#%# DataLoader
 train_n = 800
 val_n = 241
 Bsize = 4
@@ -33,80 +33,99 @@ pwc = PWC_Net(model_path='models/chairs-things.pytorch')
 # pwc = PWC_Net(model_path='../train_log/train_demo_ep002_val2.144.pytorch')
 pwc.cuda()
 pwc.train()
-#%%
-# def loss_fun(diff, eps=0.01, q=0.4):
-#     return torch.mean(torch.pow(torch.sum(torch.abs(diff), dim=1) + eps, q)).squeeze()
-def loss_fun(diff):
-    return torch.mean(torch.sqrt(torch.sum(torch.pow(diff, 2), dim=1))).squeeze()
-from torch import optim
-from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter(log_dir="..\\train_log_L2", flush_secs=180)
-# pwc = PWC_Net(model_path='models/sintel.pytorch')
-optimizer = optim.Adam(pwc.parameters(), lr=0.0001, weight_decay=0.0004)
-# loader = DataLoader(dataset=SintelClean, batch_size=1,
-#                     shuffle=True, drop_last=True,)
-#                     sampler=torch.utils.data.RandomSampler(SintelClean))
-alpha_w = [None, 0.005, 0.01, 0.02, 0.08, 0.32]
-globstep = 0
-#%%
+#%
 import matplotlib
 matplotlib.use("Agg") # prevent image output
 #%%
-epocs = 50
+# def loss_fun(diff, eps=0.01, q=0.4):
+#     return torch.mean(torch.pow(torch.sum(torch.abs(diff), dim=1) + eps, q)).squeeze()
+def loss_fun(diff):  # EPE loss for each pixel summed over space mean over samples
+    return torch.mean(torch.sum(torch.sqrt(torch.sum(torch.pow(diff, 2), dim=1)), dim=[1, 2])).squeeze()
+from torch import optim
+from torch.utils.tensorboard import SummaryWriter
+outdir = "..\\train_log_L2_sum_err"
+writer = SummaryWriter(log_dir=outdir, flush_secs=180)
+optimizer = optim.Adam(pwc.parameters(), lr=0.00001, weight_decay=0.0004)
+alpha_w = [None, 0.005, 0.01, 0.02, 0.08, 0.32]
+globstep = 0
+#%%
+optimizer = optim.Adam(pwc.parameters(), lr=0.000005, weight_decay=0.0004)
+epocs = 30
 #globstep = 0
-for ep_i in range(0, epocs):
+cur_ep = ep_i
+for ep_i in range(cur_ep + 1, cur_ep + 1 + epocs):
     t0 = time.time()
     running_loss = 0
     running_mepe = 0
+    running_loss_lvl = np.zeros((6,))
+    loss_lvl = [0] * 6
     for Bi, sample in enumerate(train_loader):
         # Can I know which image is it?
         optimizer.zero_grad()
         im1, im2, trflow = sample
         trflow_pyr = resize_pyramid(trflow.cuda())
         predflow_pyr = pwc(im1.cuda(), im2.cuda())
+        loss_lvl = [0] * 6
         loss = alpha_w[1] * loss_fun(FLOW_SCALE * predflow_pyr[0] - trflow_pyr[0])
+        loss_lvl[1] = torch.tensor(loss.detach(), requires_grad=False)
+        # loss = torch.tensor(loss_lvl[1], requires_grad=True) # create a new tensor with same grad
         for level in range(2, 6):
-            loss = loss + alpha_w[level] * loss_fun(FLOW_SCALE * predflow_pyr[level] - trflow_pyr[level - 1])
+            loss_lvl[level] = alpha_w[level] * loss_fun(FLOW_SCALE * predflow_pyr[level] - trflow_pyr[level - 1])
+            loss += loss_lvl[level]
         loss.backward()
         optimizer.step()
         globstep += 1
         running_loss += loss.detach().cpu().numpy()
+        for level in range(1, 6):
+            running_loss_lvl[level] += loss_lvl[level].detach().cpu().numpy()
         mepes = []
         for si in range(im1.shape[0]):
             mepe = evaluate_flow(trflow_pyr[0][si, :].detach().cpu().permute(1, 2, 0).numpy(),
                           FLOW_SCALE * predflow_pyr[0][si, :].detach().cpu().permute(1, 2, 0).numpy())
             running_mepe += mepe
             mepes.append(mepe)
-        print("%.3f sec, %d batch, B mepe %.3f, running loss %.2f, running mepe %.2f" % (time.time() - t0,
-            Bi + 1, np.mean(mepes), running_loss / (Bi + 1) / Bsize, running_mepe / (Bi + 1) / Bsize, ))
+        print("%.3f sec, batch %d, B mepe %.3f, running mepe %.2f, running loss %.2f (%.2f, %.2f, %.2f, %.2f, %.2f)" % (time.time() - t0,
+            Bi + 1, np.mean(mepes), running_mepe / (Bi + 1) / Bsize, running_loss / (Bi + 1),
+            *tuple(running_loss_lvl[1:] / (Bi + 1))))
         if (Bi) % 50 == 0:
             writer.add_scalar('Loss/loss', loss, global_step=globstep)
-            writer.add_scalar('Loss/running_loss', running_loss / Bsize/ (Bi+1), global_step=globstep)
+            writer.add_scalar('Loss/running_loss', running_loss / (Bi + 1), global_step=globstep)
+            for l in range(1, 6):
+                writer.add_scalar('LossParts/running_loss lvl%d' % l , running_loss_lvl[l] / (Bi + 1), global_step=globstep)
             writer.add_scalar('Eval/mepe', mepe, global_step=globstep)
-            writer.add_scalar('Eval/running_mepe', running_mepe / Bsize/ (Bi + 1), global_step=globstep)
+            writer.add_scalar('Eval/running_mepe', running_mepe / Bsize / (Bi + 1), global_step=globstep)
             figh_list = visualize_pyr(predflow_pyr, trflow_pyr, im1=im1, im2=im2, level=None)
             for si in range(len(figh_list)):
                 writer.add_figure('Figure/flow_cmp%d'%si, figh_list[si], global_step=globstep)
     val_loss = 0
     val_mepe = 0
+    val_loss_lvl = np.zeros((6,))
     with torch.no_grad():
         for Bi, sample in enumerate(val_loader):
             im1, im2, trflow = sample
             trflow_pyr = resize_pyramid(trflow.cuda())
             predflow_pyr = pwc(im1.cuda(), im2.cuda())
+            loss_lvl = [0] * 6
             loss = alpha_w[1] * loss_fun(FLOW_SCALE * predflow_pyr[0] - trflow_pyr[0])
+            loss_lvl[1] = torch.tensor(loss.detach(), requires_grad=False)
             for level in range(2, 6):
-                loss = loss + alpha_w[level] * loss_fun(FLOW_SCALE * predflow_pyr[level] - trflow_pyr[level - 1])
+                loss_lvl[level] = alpha_w[level] * loss_fun(FLOW_SCALE * predflow_pyr[level] - trflow_pyr[level - 1])
+                loss += loss_lvl[level]
             val_loss += loss.detach().cpu().numpy()
+            for level in range(1, 6):
+                val_loss_lvl[level] += loss_lvl[level].detach().cpu().numpy()
             for si in range(im1.shape[0]):
                 mepe = evaluate_flow(trflow_pyr[0][si, :].detach().cpu().permute(1, 2, 0).numpy(),
                                      FLOW_SCALE * predflow_pyr[0][si, :].detach().cpu().permute(1, 2, 0).numpy())
                 val_mepe += mepe
-    writer.add_scalar('Loss/val_loss', val_loss / val_n, global_step=globstep)
+    writer.add_scalar('Loss/val_loss', val_loss / val_n * Bsize, global_step=globstep)
     writer.add_scalar('Eval/val_mepe', val_mepe / val_n, global_step=globstep)
-    writer.add_scalar('Loss/full_loss', (running_loss + val_loss) / (val_n + train_n), global_step=globstep)
+    writer.add_scalar('Loss/full_loss', (running_loss + val_loss) / (val_n + train_n) * Bsize, global_step=globstep)
+    for l in range(1, 6):
+        writer.add_scalar('LossParts/val_loss lvl%d' % l, val_loss_lvl[l] / val_n * Bsize, global_step=globstep)
+        writer.add_scalar('LossParts/full_loss lvl%d' % l, (running_loss_lvl[l] + val_loss_lvl[l]) / (val_n + train_n) * Bsize, global_step=globstep)
     writer.add_scalar('Eval/full_mepe', (running_mepe + val_mepe) / (val_n + train_n), global_step=globstep)
-    torch.save(pwc.state_dict(), r"../train_log_L2/train_demo_ep%03d_val%.3f.pytorch" % (ep_i, val_mepe / val_n))
+    torch.save(pwc.state_dict(), join(outdir, "train_demo_ep%03d_val%.3f.pytorch" % (ep_i, val_mepe / val_n)))
 
 #%%
 # Using batch size of one to pass, it's fine, nothing wrong.
