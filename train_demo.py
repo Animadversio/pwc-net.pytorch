@@ -5,6 +5,7 @@ import torch
 import torch.nn.functional as F
 from torchvision import transforms
 from PWC_src import PWC_Net
+from PWC_src.pwc_ablation_ups import PWC_Net as PWC_Net_abl_ups
 from PWC_src import flow_to_image, read_flow, write_flow, flow_error, segment_flow, evaluate_flow
 from visualization import visualize_pyr, visualize_samples, visualize_batch_samples
 FLOW_SCALE = 20.0
@@ -28,26 +29,27 @@ train_loader = DataLoader(dataset=Stl_train_set, batch_size=Bsize,
 val_loader = DataLoader(dataset=Stl_val_set, batch_size=Bsize,
                     shuffle=False, drop_last=False,)  # maybe validation doesn't require cropping?
 #%%
-pwc = PWC_Net(model_path='models/chairs-things.pytorch')
 # pwc = PWC_Net(model_path='models/sintel.pytorch')
 # pwc = PWC_Net(model_path='../train_log/train_demo_ep002_val2.144.pytorch')
+pwc = PWC_Net_abl_ups(model_path='models/chairs-things.pytorch')
 pwc.cuda()
 pwc.train()
 #%
 import matplotlib
 matplotlib.use("Agg") # prevent image output
 #%%
-# def loss_fun(diff, eps=0.01, q=0.4):
-#     return torch.mean(torch.pow(torch.sum(torch.abs(diff), dim=1) + eps, q)).squeeze()
-def loss_fun(diff):  # EPE loss for each pixel summed over space mean over samples
-    return torch.mean(torch.sum(torch.sqrt(torch.sum(torch.pow(diff, 2), dim=1)), dim=[1, 2])).squeeze()
+def loss_fun(diff, eps=0.01, q=0.4):
+    return torch.mean(torch.sum(torch.pow(torch.sum(torch.abs(diff), dim=1) + eps, q), dim=[1, 2])).squeeze()
+# def loss_fun(diff):  # EPE loss for each pixel summed over space mean over samples
+#     return torch.mean(torch.sum(torch.sqrt(torch.sum(torch.pow(diff, 2), dim=1)), dim=[1, 2])).squeeze()
 from torch import optim
 from torch.utils.tensorboard import SummaryWriter
-outdir = "..\\train_log_L2_sum_err"
+outdir = "..\\train_log_FeatUpsAblation"
 writer = SummaryWriter(log_dir=outdir, flush_secs=180)
-optimizer = optim.Adam(pwc.parameters(), lr=0.00001, weight_decay=0.0004)
+#optimizer = optim.Adam(pwc.parameters(), lr=0.00001, weight_decay=0.0004)
 alpha_w = [None, 0.005, 0.01, 0.02, 0.08, 0.32]
 globstep = 0
+ep_i = 0
 #%%
 optimizer = optim.Adam(pwc.parameters(), lr=0.000005, weight_decay=0.0004)
 epocs = 30
@@ -126,7 +128,8 @@ for ep_i in range(cur_ep + 1, cur_ep + 1 + epocs):
         writer.add_scalar('LossParts/full_loss lvl%d' % l, (running_loss_lvl[l] + val_loss_lvl[l]) / (val_n + train_n) * Bsize, global_step=globstep)
     writer.add_scalar('Eval/full_mepe', (running_mepe + val_mepe) / (val_n + train_n), global_step=globstep)
     torch.save(pwc.state_dict(), join(outdir, "train_demo_ep%03d_val%.3f.pytorch" % (ep_i, val_mepe / val_n)))
-
+#%%
+# changed loss function to robust loss at 14k steps
 #%%
 # Using batch size of one to pass, it's fine, nothing wrong.
 # But Batch size of 2 will cause distortion in the output! (Batch norm not working?)
