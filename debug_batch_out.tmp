@@ -223,8 +223,7 @@ samp1, u: -0.13 (0.10) [-0.35, 0.18]; v: 0.05 (0.06) [-0.20, 0.22]
 samp1, u: -0.02 (0.15) [-0.47, 0.39]; v: -0.02 (0.13) [-0.24, 0.30]
 
 ## model ep062_val2.373.pytorch
-Clean Pass
-MEAN ()
+Clean Pass, MEAN 
 Full resolution MEPE 1.8650
 Level 2 MEPE 1.8118 
 Level 3 MEPE 2.4682 
@@ -283,6 +282,21 @@ Level 4 MEPE 3.8934
 Level 5 MEPE 5.3265 
 Level 6 MEPE 13.1609 
 
+Flying Chair Batch 5709 4632.992
+Full resolution MEPE 2.5777 (npy)
+Level 2 MEPE 2.4682 
+Level 3 MEPE 3.0113 
+Level 4 MEPE 3.8352 
+Level 5 MEPE 5.1434 
+Level 6 MEPE 11.1815 
+
+# Upsampling + fine tune on Sintel Clean xx epocs
+Clean Pass
+
+
+Final Pass
+
+
 Flying Chair
 
 
@@ -310,3 +324,23 @@ Level 3 MEPE 2.9136
 Level 4 MEPE 3.7875 
 Level 5 MEPE 5.4239 
 Level 6 MEPE 10.5563 
+
+
+# Feat Ablation + Upsampling + fine tune on Sintel Clean 99 epocs
+Clean Pass
+Full resolution MEPE 2.0623 (npy)
+Level 2 MEPE 1.9689 
+Level 3 MEPE 2.1619 
+Level 4 MEPE 3.0878 
+Level 5 MEPE 4.6774 
+Level 6 MEPE 12.9720 
+
+Final Pass
+Full resolution MEPE 3.8735 (npy)
+Level 2 MEPE 3.8024 
+Level 3 MEPE 3.9598 
+Level 4 MEPE 4.7768 
+Level 5 MEPE 6.2940 
+Level 6 MEPE 12.9720 
+
+Flying Chair Dataset

@@ -122,7 +122,7 @@ trflow_pyr = resize_pyramid(trflow.unsqueeze(0).cuda())
 predflow_pyr = pwc(im1.unsqueeze(0).cuda(), im2.unsqueeze(0).cuda())
 visualize_pyr(predflow_pyr, trflow_pyr, im1=im1, im2=im2,level=None)
 #%%
-#%%
+#%% Distribution of model parameters
 tmp_dict = pwc.moduleExtractor.moduleSix.state_dict()
 list(tmp_dict.keys())
 for param in tmp_dict.keys():
