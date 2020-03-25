@@ -30,17 +30,23 @@ train_loader = DataLoader(dataset=Stl_train_set, batch_size=Bsize,
 val_loader = DataLoader(dataset=Stl_val_set, batch_size=Bsize,
                     shuffle=False, drop_last=False,)  # maybe validation doesn't require cropping?
 #%%
+import matplotlib
+matplotlib.use("Agg") # prevent image output
+#%%
 from PWC_src.pwc_ups_abl import PWC_Net as PWC_Net_ups
 # pwc = PWC_Net_abl(model_path='models/chairs-things.pytorch')
 pwc = PWC_Net_ups(model_path='models/chairs-things.pytorch')
 # pwc = PWC_Net(model_path='models/sintel.pytorch')
 # pwc = PWC_Net(model_path='../train_log/train_demo_ep002_val2.144.pytorch')
-pwc = PWC_Net_abl_ups(model_path='models/chairs-things.pytorch')
+# pwc = PWC_Net_abl_ups(model_path='models/chairs-things.pytorch')
 pwc.cuda()
 pwc.train()
 #%
-import matplotlib
-matplotlib.use("Agg") # prevent image output
+
+#%%
+from PWC_src import PWC_Net
+pwc = PWC_Net(model_path='../train_log_L2_sum_err/train_demo_ep069_val2.436.pytorch')
+pwc.cuda().train()
 #%%
 def loss_fun(diff, eps=0.01, q=0.4):
     return torch.mean(torch.sum(torch.pow(torch.sum(torch.abs(diff), dim=1) + eps, q), dim=[1, 2])).squeeze()
@@ -48,8 +54,9 @@ def loss_fun(diff, eps=0.01, q=0.4):
 #     return torch.mean(torch.sum(torch.sqrt(torch.sum(torch.pow(diff, 2), dim=1)), dim=[1, 2])).squeeze()
 from torch import optim
 from torch.utils.tensorboard import SummaryWriter
-outdir = "..\\train_log_FeatUpsAblation"
-outdir = "..\\train_log_ups_abl" # "..\\train_log_L2_sum_err"
+# outdir = "..\\train_log_FeatUpsAblation"
+# outdir = "..\\train_log_ups_abl" # "..\\train_log_L2_sum_err"
+outdir = "..\\train_log_L2_sum_err_cyclic"
 writer = SummaryWriter(log_dir=outdir, flush_secs=180)
 #optimizer = optim.Adam(pwc.parameters(), lr=0.00001, weight_decay=0.0004)
 alpha_w = [None, 0.005, 0.01, 0.02, 0.08, 0.32]
@@ -57,11 +64,13 @@ globstep = 0
 ep_i = -1
 #%%
 from torch.optim.lr_scheduler import CyclicLR
-# optimizer = optim.SGD(pwc.parameters(), lr=0.0001, weight_decay=0.0004)
-# scheduler = CyclicLR(optimizer, 6.25e-06, 0.0001, step_size_up=2000, step_size_down=2000, mode='triangular2')
+optimizer = optim.SGD(pwc.parameters(), lr=0.00001, weight_decay=0.0004)
+scheduler = CyclicLR(optimizer, 6.25e-06, 0.00004, step_size_up=2000, step_size_down=2000, mode='triangular2')
 # optimizer = optim.Adam(pwc.parameters(), lr=0.000005, weight_decay=0.0004) # change to 5E-6 at 20 epoc train to 70 epoc
-optimizer = optim.Adam(pwc.parameters(), lr=0.00003, weight_decay=0.0004)  # starts from 3E-5
-epocs = 10
+# 10 epoc 3E-5, 30 epoc 2E-5, 20 epoc 1E-5, 20 epoc 5E-6, 20 epoc 2.5E-6, 20 epoc 1.25E-6, 20 epoc 1.5E-5
+# 20 epoc 1E-5
+# optimizer = optim.Adam(pwc.parameters(), lr=0.00001, weight_decay=0.0004)  # starts from 3E-5
+epocs = 200
 cur_ep = ep_i
 for ep_i in range(cur_ep + 1, cur_ep + 1 + epocs):
     t0 = time.time()
@@ -84,7 +93,7 @@ for ep_i in range(cur_ep + 1, cur_ep + 1 + epocs):
             loss += loss_lvl[level]
         loss.backward()
         optimizer.step()
-        # scheduler.step()
+        scheduler.step()
         globstep += 1
         running_loss += loss.detach().cpu().numpy()
         for level in range(1, 6):
@@ -99,7 +108,7 @@ for ep_i in range(cur_ep + 1, cur_ep + 1 + epocs):
             Bi + 1, np.mean(mepes), running_mepe / (Bi + 1) / Bsize, running_loss / (Bi + 1),
             *tuple(running_loss_lvl[1:] / (Bi + 1))))
         if (Bi) % 50 == 0:
-            # writer.add_scalar('optim/lr', scheduler.get_lr()[0], global_step=globstep)
+            writer.add_scalar('optim/lr', scheduler.get_lr()[0], global_step=globstep)
             writer.add_scalar('Loss/loss', loss, global_step=globstep)
             writer.add_scalar('Loss/running_loss', running_loss / (Bi + 1), global_step=globstep)
             for l in range(1, 6):
@@ -130,7 +139,7 @@ for ep_i in range(cur_ep + 1, cur_ep + 1 + epocs):
                 mepe = evaluate_flow(trflow_pyr[0][si, :].detach().cpu().permute(1, 2, 0).numpy(),
                                      FLOW_SCALE * predflow_pyr[0][si, :].detach().cpu().permute(1, 2, 0).numpy())
                 val_mepe += mepe
-    # writer.add_scalar('optim/lr', scheduler.get_lr()[0], global_step=globstep)
+    writer.add_scalar('optim/lr', scheduler.get_lr()[0], global_step=globstep)
     writer.add_scalar('Loss/val_loss', val_loss / val_n * Bsize, global_step=globstep)
     writer.add_scalar('Eval/val_mepe', val_mepe / val_n, global_step=globstep)
     writer.add_scalar('Loss/full_loss', (running_loss + val_loss) / (val_n + train_n) * Bsize, global_step=globstep)

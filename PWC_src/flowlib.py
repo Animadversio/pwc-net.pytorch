@@ -372,7 +372,7 @@ def read_image(filename):
     im = np.array(img)
     return im
 
-
+#%%
 def warp_image(im, flow):
     """
     Use optical flow to warp image to the next
@@ -386,8 +386,8 @@ def warp_image(im, flow):
     flow_height = flow.shape[0]
     flow_width = flow.shape[1]
     n = image_height * image_width
-    (iy, ix) = np.mgrid[0:image_height, 0:image_width]
-    (fy, fx) = np.mgrid[0:flow_height, 0:flow_width]
+    (iy, ix) = np.mgrid[0:image_height, 0:image_width].astype(np.float32)
+    (fy, fx) = np.mgrid[0:flow_height, 0:flow_width].astype(np.float32)
     fx += flow[:,:,0]
     fy += flow[:,:,1]
     mask = np.logical_or(fx <0 , fx > flow_width)
@@ -400,12 +400,12 @@ def warp_image(im, flow):
     warp = np.zeros((image_height, image_width, im.shape[2]))
     for i in range(im.shape[2]):
         channel = im[:, :, i]
-        plt.imshow(channel, cmap='gray')
+        # plt.imshow(channel, cmap='gray')
         values = channel.reshape(n, 1)
-        new_channel = interpolate.griddata(points, values, xi, method='cubic')
+        new_channel = interpolate.griddata(points, values, xi, method='linear')
         new_channel = np.reshape(new_channel, [flow_height, flow_width])
         new_channel[mask] = 1
-        warp[:, :, i] = new_channel.astype(np.uint8)
+        warp[:, :, i] = (255.0 * new_channel).astype(np.uint8)
 
     return warp.astype(np.uint8)
 

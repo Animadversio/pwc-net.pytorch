@@ -64,7 +64,6 @@ def weight_grad_stats_for_plot(model):
                 if param.grad is not None:
                     print("\t\t%s : w %.4E, grad %.4E" % (
                     str(list(param.shape)), param.abs().mean(), param.grad.abs().mean()))
-                    stat_dict.append((name, subname, param.abs().mean().detach().cpu().numpy(), param.grad.abs().mean().detach().cpu().numpy()))
                 else:
                     print("\t\t%s : w %.4E, grad not reached" % (str(list(param.shape)), param.abs().mean()))
     return stat_dict
@@ -187,3 +186,24 @@ for lvl in range(5,0,-1):
 # #%%
 # for name, param in pwc.moduleExtractor.moduleFou.parameters().items():
 #     print("%s %s : %E, %E" % (name, str(list(param.shape)), param.abs().mean()))
+if __name__ == "__main__":
+    pwc = PWC_Net(model_path='models/chairs-things.pytorch').cuda()
+    for param in pwc.moduleExtractor.moduleSix.parameters():
+        if param.dim() > 1:
+            torch.nn.init.xavier_normal_(param)
+    optimizer = optim.SGD(pwc.parameters(), lr=0.00001, )  # weight_decay=0.0004)
+    alpha_w = [None, 0.005, 0.01, 0.02, 0.08, 0.32]
+    optimizer.zero_grad()
+    im1, im2, trflow = SintelClean[101]
+    trflow_pyr = resize_pyramid(trflow.unsqueeze(0).cuda())
+    predflow_pyr = pwc(im1.unsqueeze(0).cuda(), im2.unsqueeze(0).cuda())
+    loss = loss_fun(FLOW_SCALE * predflow_pyr[5] - trflow_pyr[5 - 1])
+    # loss_lvl = [0] * 6
+    # loss = alpha_w[1] * loss_fun(FLOW_SCALE * predflow_pyr[0] - trflow_pyr[0])
+    # loss_lvl[1] = torch.tensor(loss.detach(), requires_grad=False)
+    # # loss = torch.tensor(loss_lvl[1], requires_grad=True) # create a new tensor with same grad
+    # for level in range(2, 6):
+    #     loss_lvl[level] = alpha_w[level] * loss_fun(FLOW_SCALE * predflow_pyr[level] - trflow_pyr[level - 1])
+    #     loss += loss_lvl[level]
+    loss.backward()
+    weight_grad_stats(pwc)
