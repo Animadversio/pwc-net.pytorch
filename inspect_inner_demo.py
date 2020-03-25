@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, Dataset, TensorDataset
 from torch import optim
 from PWC_src import PWC_Net
 from PWC_src import flow_to_image, read_flow, write_flow, flow_error, segment_flow
-
+from visualization import visualize_pyr, visualize_grad_weight, visualize_batch_samples
 from os import listdir, makedirs
 from os.path import join
 from imageio import imwrite
@@ -122,21 +122,6 @@ trflow_pyr = resize_pyramid(trflow.unsqueeze(0).cuda())
 predflow_pyr = pwc(im1.unsqueeze(0).cuda(), im2.unsqueeze(0).cuda())
 visualize_pyr(predflow_pyr, trflow_pyr, im1=im1, im2=im2,level=None)
 #%%
-#%% Distribution of model parameters
-tmp_dict = pwc.moduleExtractor.moduleSix.state_dict()
-list(tmp_dict.keys())
-for param in tmp_dict.keys():
-    print("%s: %E"%(param, tmp_dict[param].abs().mean()))
-# tmp_dict['0.weight'].abs().mean()
-
-# Note the Six layer feature extractor has no weight! not trained seemingly
-# 0.weight: 9.879992E-36
-# 0.bias: 2.317401E-03
-# 2.weight: 1.095370E-35
-# 2.bias: 1.398091E-05
-# 4.weight: 4.461260E-33
-# 4.bias: 3.139201E-25
-# So the six layer's correlation output is very unhelpful.
 #%%
 from PWC_src.flowlib import *
 import matplotlib.pylab as plt
@@ -152,11 +137,6 @@ plt.ylabel("Normalized V")
 plt.title("Middleburry Flow Color Code")
 plt.savefig("..\\Results\\FlowColorCode.png")
 plt.show()
-#%%
-
-#%%
-warp_image
-
 #%%
 import time
 #%%
@@ -185,15 +165,10 @@ for flow in flow_list:
 # torch.Size([1, 2, 7, 16])
 
 #%%
-# flow_truth = read_flow(join(sintel_flow_gt, scene, flowseq[imgi]))
-#
-# flow = flow.data.cpu()
-# flow_up = F.interpolate(flow, (flow.shape[-2] * 4, flow.shape[-1] * 4), mode='bilinear')
-# flow = flow[0].numpy().transpose((1, 2, 0))
-# flow_up = flow_up[0].numpy().transpose((1, 2, 0))  # zoom(flow, [4, 4, 1], order=1)
-# flow_im = flow_to_image(flow, display=True)
-# flow_up_im = flow_to_image(flow_up, display=True)
+import sys
+sys.path.append("E:\Github_Projects\pytorch-receptive-field")
+import torch_receptive_field
+from torch_receptive_field import receptive_field
 
-# write_flow(flow_up, join(S_clean_output, scene, imgseq[imgi].split(".")[0] + ".flo"))
-# imwrite(join(S_clean_output, scene, imgseq[imgi].split(".")[0] + "_flow.png"), flow_im)
-# imwrite(join(S_clean_output, scene, imgseq[imgi].split(".")[0] + "_flow_up.png"), flow_up_im)
+receptive_field(pwc.moduleExtractor, input_size=[436,1024])
+#%%
