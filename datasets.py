@@ -20,8 +20,8 @@ toTsr = transforms.ToTensor()
 # * Data feeding
 # *
 #%%
-# dataset_home = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets"
-dataset_home = r"E:\Datasets"
+dataset_home = r"C:\Users\PonceLab\Documents\PWC_net_Binxu\Datasets"
+# dataset_home = r"E:\Datasets"
 class SintelDataset(Dataset):
     def __init__(self, render="clean", preload=False, torchify=True, cropsize=None):
         if render == "clean":

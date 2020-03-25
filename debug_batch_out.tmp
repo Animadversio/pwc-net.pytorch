@@ -290,11 +290,22 @@ Level 4 MEPE 3.8352
 Level 5 MEPE 5.1434 
 Level 6 MEPE 11.1815 
 
-# Upsampling + fine tune on Sintel Clean xx epocs
+# Upsampling + fine tune on Sintel Clean 146 epocs
 Clean Pass
-
+Full resolution MEPE 1.5401 (npy)
+Level 2 MEPE 1.4305 
+Level 3 MEPE 1.8311 
+Level 4 MEPE 2.7723 
+Level 5 MEPE 4.1938 
+Level 6 MEPE 10.2714 
 
 Final Pass
+Full resolution MEPE 3.3873 (npy)
+Level 2 MEPE 3.3154 
+Level 3 MEPE 3.7067 
+Level 4 MEPE 4.5919 
+Level 5 MEPE 6.3316 
+Level 6 MEPE 13.1594 
 
 
 Flying Chair
@@ -317,7 +328,7 @@ Level 4 MEPE 4.9382
 Level 5 MEPE 6.6192 
 Level 6 MEPE 12.9336 
 
-Flying Chair Dataset
+Flying Chair Dataset 7619 Batch 2753.170
 Full resolution MEPE 2.6986 (npy)
 Level 2 MEPE 2.4824 
 Level 3 MEPE 2.9136 
@@ -344,3 +355,7 @@ Level 5 MEPE 6.2940
 Level 6 MEPE 12.9720 
 
 Flying Chair Dataset
+
+
+
+

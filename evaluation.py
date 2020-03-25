@@ -22,7 +22,7 @@ def eval_flow(pred_flow, gt_flow):
 #%%
 # pwc = PWC_Net(model_path='models/sintel.pytorch').cuda()
 # pwc = PWC_Net(model_path='../train_log_L2_sum_err/train_demo_ep062_val2.373.pytorch').cuda()
-pwc.train() # pwc.eval()
+# pwc.train() # pwc.eval()
 
 #%%
 def eval_mepe(pwc, eval_loader):
@@ -63,18 +63,24 @@ def eval_mepe(pwc, eval_loader):
 # pwc = PWC_Net(model_path='../train_log_L2_sum_err/train_demo_ep062_val2.373.pytorch').cuda()
 # pwc = PWC_Net(model_path='models/chairs-things.pytorch').cuda()
 # pwc = PWC_Net(model_path='models/sintel.pytorch').cuda()
-# model ablating the feature relay
+#%% model ablating the feature relay
 from PWC_src.pwc_ablation import PWC_Net as PWC_Net_abl
 # pwc = PWC_Net_abl(model_path='../train_log_feat_abl/train_demo_ep064_val2.145.pytorch').cuda()
 # model ablating the feature relay and upsampling
-from PWC_src.pwc_ablation_ups import PWC_Net as PWC_Net_abl_ups
-pwc = PWC_Net_abl_ups("../train_log_FeatUpsAblation/train_demo_ep099_val2.395.pytorch").cuda()
+# from PWC_src.pwc_ablation_ups import PWC_Net as PWC_Net_abl_ups
+# pwc = PWC_Net_abl_ups("../train_log_FeatUpsAblation/train_demo_ep099_val2.395.pytorch").cuda()
+from PWC_src.pwc_ups_abl import PWC_Net as PWC_net_ups_abl
+# pwc = PWC_net_ups_abl("../train_log_ups_abl/train_demo_ep117_val1.993.pytorch").cuda()
+#pwc = PWC_net_ups_abl("../train_log_ups_abl/train_demo_ep073_val1.986.pytorch").cuda()
+# pwc = PWC_net_ups_abl("../train_log_ups_abl/train_demo_ep146_val1.904.pytorch").cuda()
+from PWC_src.pwc import PWC_Net
+pwc = PWC_Net(model_path="../train_log_L2_sum_err_cyclic/train_demo_ep193_val2.396.pytorch").cuda()
 pwc.train()
 Bsize = 4
-dataSet = SintelDataset(render="clean", torchify=True, cropsize=None)
+dataSet = SintelDataset(render="final", torchify=True, cropsize=None)
 # dataSet = FlyingChairDataset(torchify=True, cropsize=None)
 eval_loader = DataLoader(dataset=dataSet, batch_size=Bsize, shuffle=False, drop_last=False,)
-savename = "%s_model_%s" % ("Sintel_clean", "ups_feat_abl_ep99") # feat_abl_ep64
+savename = "%s_model_%s" % ("Sintel_final", "L2_cyc_ep193") # feat_abl_ep64
 mepe_frs, mepe_level = eval_mepe(pwc, eval_loader)
 pickle.dump({"mepe_hrs": mepe_frs, "mepe_level": mepe_level}, open("..\\%s_EPE_lvl.pk" % savename, "wb"))
 #%%
