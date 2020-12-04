@@ -43,3 +43,9 @@ If you find this implementation useful in your work, please acknowledge it appro
 ### Acknowledgments
 * [sniklaus/pytorch-pwc](https://github.com/sniklaus/pytorch-pwc): Network defintion and converted PyTorch model weights.
 * [NVIDIA/flownet2-pytorch](https://github.com/NVIDIA/flownet2-pytorch): Correlation module.
+
+### Modification
+This repo is forked and modified by Animadversio, for the purpose of a course project. 
+The project majorly analyze the network anatomy and function of the inner representation of this network.
+
+`pip install pypng` is needed. 
